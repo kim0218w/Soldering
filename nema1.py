@@ -3,7 +3,6 @@ import lgpio, time, math
 # ---------- 핀 설정(BCM 번호) ----------
 DIR_PIN = 17
 PUL_PIN = 18
-ENA_PIN = 27
 
 # ---------- 기구/드라이버 파라미터 ----------
 GEAR = 54
@@ -31,7 +30,6 @@ def s_curve_delay(progress):
 
 def rotate_output_one_rev(h, cw=True):
     lgpio.gpio_write(h, DIR_PIN, 1 if cw else 0)
-    lgpio.gpio_write(h, ENA_PIN, 1)
 
     accel_steps = int(PULSES_OUTPUT_REV * ACCEL_RATIO)
     decel_steps = accel_steps
@@ -51,14 +49,11 @@ def rotate_output_one_rev(h, cw=True):
         delay = s_curve_delay(1 - i / decel_steps)
         pulse_once(h, PUL_PIN, delay)
 
-    lgpio.gpio_write(h, ENA_PIN, 0)
-
 if __name__ == "__main__":
     h = lgpio.gpiochip_open(0)
     try:
         lgpio.gpio_claim_output(h, DIR_PIN, 0)
         lgpio.gpio_claim_output(h, PUL_PIN, 0)
-        lgpio.gpio_claim_output(h, ENA_PIN, 0)
 
         print(f"[INFO] gear={GEAR}:1, microstep={MICROSTEP}, pulses/rev={PULSES_OUTPUT_REV}")
         print("[RUN] 출력축 1바퀴 CW (S-curve)")
@@ -74,4 +69,3 @@ if __name__ == "__main__":
         print("\n[STOP] 사용자 인터럽트")
     finally:
         lgpio.gpiochip_close(h)
-
