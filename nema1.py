@@ -74,3 +74,4 @@ if __name__ == "__main__":
         print("\n[STOP] 사용자 인터럽트")
     finally:
         lgpio.gpiochip_close(h)
+
