@@ -7,11 +7,12 @@ PRIMARY_DIR_PIN = 17   # 첫 번째 드라이버 DIR+
 PRIMARY_PUL_PIN = 18   # 첫 번째 드라이버 PUL+
 SECONDARY_DIR_PIN = 27  # 두 번째 드라이버 DIR+
 SECONDARY_PUL_PIN = 22  # 두 번째 드라이버 PUL+
-DIR_PIN = 23
-PUL_PIN = 24
+THIRD_DIR_PIN = 23      # 세 번째 드라이버 DIR+
+THIRD_PUL_PIN = 24      # 세 번째 드라이버 PUL+
 DRIVERS = (
     ("FIRST", PRIMARY_DIR_PIN, PRIMARY_PUL_PIN),
     ("SECOND", SECONDARY_DIR_PIN, SECONDARY_PUL_PIN),
+    ("THIRD", THIRD_DIR_PIN, THIRD_PUL_PIN),
 )
 
 # ---------- 기구/드라이버 파라미터 ----------
@@ -91,8 +92,13 @@ if __name__ == "__main__":
         # 사용자 입력
         angle_first = float(input("FIRST 모터 회전 각도 (deg): ").strip())
         dir_first = input("FIRST 방향 (CW/CCW): ").strip().upper()
+
         angle_second = float(input("SECOND 모터 회전 각도 (deg): ").strip())
         dir_second = input("SECOND 방향 (CW/CCW): ").strip().upper()
+
+        angle_third = float(input("THIRD 모터 회전 각도 (deg): ").strip())
+        dir_third = input("THIRD 방향 (CW/CCW): ").strip().upper()
+
         loop_count = int(input("몇 번 반복할까요?: ").strip())
 
         # 루프 실행
@@ -108,6 +114,12 @@ if __name__ == "__main__":
             print(f"[RUN] SECOND 모터 {angle_second}° {dir_second}")
             rotate_driver_angle(
                 h, SECONDARY_DIR_PIN, SECONDARY_PUL_PIN, angle_second, cw=(dir_second == "CW")
+            )
+            time.sleep(0.5)
+
+            print(f"[RUN] THIRD 모터 {angle_third}° {dir_third}")
+            rotate_driver_angle(
+                h, THIRD_DIR_PIN, THIRD_PUL_PIN, angle_third, cw=(dir_third == "CW")
             )
             time.sleep(0.5)
 
