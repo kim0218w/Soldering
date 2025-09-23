@@ -7,6 +7,8 @@ PRIMARY_DIR_PIN = 17   # 첫 번째 드라이버 DIR+
 PRIMARY_PUL_PIN = 18   # 첫 번째 드라이버 PUL+
 SECONDARY_DIR_PIN = 27  # 두 번째 드라이버 DIR+
 SECONDARY_PUL_PIN = 22  # 두 번째 드라이버 PUL+
+DIR_PIN = 23
+PUL_PIN = 24
 DRIVERS = (
     ("FIRST", PRIMARY_DIR_PIN, PRIMARY_PUL_PIN),
     ("SECOND", SECONDARY_DIR_PIN, SECONDARY_PUL_PIN),
@@ -115,4 +117,3 @@ if __name__ == "__main__":
         print("\n[STOP] 사용자 인터럽트")
     finally:
         lgpio.gpiochip_close(h)
-
