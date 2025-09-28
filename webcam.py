@@ -1,21 +1,24 @@
 import cv2
 from ultralytics import YOLO
+from picamera2 import Picamera2
 
 def run_webcam():
-    model = YOLO("C:/Users/kim02/OneDrive/바탕 화면/soldering/pcb_yolov8m_trained.pt")
-    cap = cv2.VideoCapture(0)
+    model = YOLO("pcb_yolov8m_trained.pt")
+
+    picam2 = Picamera2()
+    picam2.preview_configuration.main.size = (640, 480)
+    picam2.preview_configuration.main.format = "RGB888"
+    picam2.configure("preview")
+    picam2.start()
 
     while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+        frame = picam2.capture_array()
 
         results = model(frame)[0]
         boxes = results.boxes.xyxy.cpu().numpy()
         cls = results.boxes.cls.cpu().numpy().astype(int)
         conf = results.boxes.conf.cpu().numpy()
 
-        # 중심좌표 기반 정렬 (상→하, 좌→우)
         centers = [((b[0]+b[2])/2, (b[1]+b[3])/2, i) for i, b in enumerate(boxes)]
         centers_sorted = sorted(centers, key=lambda x: (int(x[1]//50), x[0]))
 
@@ -30,5 +33,5 @@ def run_webcam():
         if cv2.waitKey(1) & 0xFF == 27:  # ESC
             break
 
-    cap.release()
     cv2.destroyAllWindows()
+    picam2.stop()
