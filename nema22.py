@@ -5,8 +5,8 @@ import math
 
 # --- 모터 핀 설정 (BCM 번호) ---
 # 예시 핀 번호: 실제 배선에 맞게 수정하세요
-step_pin_1, dir_pin_1, en_pin_1 = 17, 18, 6
-step_pin_2, dir_pin_2, en_pin_2 = 27, 22, 13
+step_pin_1, dir_pin_1, en_pin_1 = 18, 17, 6
+step_pin_2, dir_pin_2, en_pin_2 = 22, 27, 13
 
 MOTORS = [
     {"step": step_pin_1, "dir": dir_pin_1, "en": en_pin_1, "name": "모터1"},
