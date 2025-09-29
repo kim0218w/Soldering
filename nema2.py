@@ -62,14 +62,14 @@ def main():
     try:
         while True:
             for m in MOTORS:
-                print(f"👉 {m['name']} 시계 방향 회전 중...")
+                print(f" {m['name']} 시계 방향 회전 중...")
                 move_steps(h, m, steps=200, direction=1, delay=0.002)  # 200스텝(=1회전)
-                print(f"✅ {m['name']} 완료, 모터 OFF")
+                print(f" {m['name']} 완료, 모터 OFF")
                 time.sleep(1)  # 모터 끈 상태에서 잠시 대기
 
-                print(f"👉 {m['name']} 반시계 방향 회전 중...")
+                print(f" {m['name']} 반시계 방향 회전 중...")
                 move_steps(h, m, steps=200, direction=0, delay=0.002)
-                print(f"✅ {m['name']} 완료, 모터 OFF")
+                print(f" {m['name']} 완료, 모터 OFF")
                 time.sleep(1)
 
     except KeyboardInterrupt:
