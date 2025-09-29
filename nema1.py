@@ -1,8 +1,8 @@
 import lgpio, time, math
 
 # ---------- 핀 설정(BCM 번호) ----------
-DIR_PIN = 17
-PUL_PIN = 18
+DIR_PIN = 27
+PUL_PIN = 17
 
 # ---------- 기구/드라이버 파라미터 ----------
 GEAR = 54
@@ -69,3 +69,4 @@ if __name__ == "__main__":
         print("\n[STOP] 사용자 인터럽트")
     finally:
         lgpio.gpiochip_close(h)
+
