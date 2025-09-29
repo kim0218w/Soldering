@@ -1,4 +1,4 @@
-# stepper_4motor_scurve_sequential.py
+# stepper_4motor_turn_off_after_each.py
 import lgpio
 import time
 import math
@@ -16,14 +16,13 @@ MOTORS = [
     {"step": step_pin_4, "dir": dir_pin_4, "name": "모터4"},
 ]
 
-# 마이크로스텝 설정 (TB6600 DIP 스위치에 맞게 수정)
+# --- 스텝모터 파라미터 ---
 MICROSTEP = 1
 STEPS_PER_REV = 200 * MICROSTEP
 DEG_PER_STEP = 360.0 / STEPS_PER_REV
 
-# 하드웨어 타이밍
-DIR_SETUP_S = 0.000010       # 10us
-STEP_PULSE_MIN_S = 0.000010  # 10us
+DIR_SETUP_S = 0.000010
+STEP_PULSE_MIN_S = 0.000010
 
 def gpio_init():
     h = lgpio.gpiochip_open(0)
@@ -41,66 +40,37 @@ def gpio_cleanup(h):
             pass
     lgpio.gpiochip_close(h)
 
-def s_curve_profile(steps: int):
-    if steps <= 1:
-        return [1.0]
-    return [(1 - math.cos(math.pi * i / (steps - 1))) / 2 for i in range(steps)]
-
-def move_stepper(h, motor, current_angle, target_angle, duration=1.0):
+def move_steps(h, motor, steps, direction=1, delay=0.002):
+    """단순 스텝 구동"""
     step_pin, dir_pin = motor["step"], motor["dir"]
 
-    delta_angle = target_angle - current_angle
-    steps_needed = int(round(abs(delta_angle) / DEG_PER_STEP))
-    if steps_needed == 0:
-        return target_angle
-
-    direction = 1 if delta_angle > 0 else 0
     lgpio.gpio_write(h, dir_pin, direction)
     time.sleep(DIR_SETUP_S)
 
-    EPS = 0.15
-    base_profile = s_curve_profile(steps_needed)
-    speed_weights = [EPS + (1.0 - EPS) * v for v in base_profile]
-
-    inv_sum = sum(1.0 / w for w in speed_weights)
-    k = duration / inv_sum
-
-    for w in speed_weights:
-        period = max(k / w, STEP_PULSE_MIN_S * 2)
-        high_t = max(STEP_PULSE_MIN_S, period / 2)
-        low_t = max(STEP_PULSE_MIN_S, period - high_t)
-
+    for _ in range(steps):
         lgpio.gpio_write(h, step_pin, 1)
-        time.sleep(high_t)
+        time.sleep(delay/2)
         lgpio.gpio_write(h, step_pin, 0)
-        time.sleep(low_t)
+        time.sleep(delay/2)
 
-    return target_angle
+    # 모터 끄기 (DIR, STEP 모두 LOW)
+    lgpio.gpio_write(h, step_pin, 0)
+    lgpio.gpio_write(h, dir_pin, 0)
 
 def main():
     h = gpio_init()
-    current_angles = [0.0, 0.0, 0.0, 0.0]
-
-    print("순차 입력 모드: 모터1 → 모터2 → 모터3 → 모터4 순서로 각도 입력 후 즉시 동작합니다.")
-    print("입력 예) 90   (엔터만 치면 건너뜀, q 입력 시 종료)")
     try:
         while True:
-            for i, m in enumerate(MOTORS):
-                raw = input(f"{m['name']} 목표 각도? (현재 {current_angles[i]:.1f}°) : ").strip()
-                if raw.lower() in ("q", "quit", "exit"):
-                    raise KeyboardInterrupt
-                if raw == "":
-                    print(f" - {m['name']} 건너뜀")
-                    continue
-                try:
-                    target = float(raw)
-                except ValueError:
-                    print("⚠️ 숫자를 입력하세요. (예: 90, -45)")
-                    continue
+            for m in MOTORS:
+                print(f"👉 {m['name']} 시계 방향 회전 중...")
+                move_steps(h, m, steps=200, direction=1, delay=0.002)  # 200스텝(=1회전)
+                print(f"✅ {m['name']} 완료, 모터 OFF")
+                time.sleep(1)  # 모터 끈 상태에서 잠시 대기
 
-                print(f"👉 {m['name']} {current_angles[i]:.1f}° → {target:.1f}° 이동 중...")
-                current_angles[i] = move_stepper(h, m, current_angles[i], target, duration=2.0)
-                print(f"✅ {m['name']} 완료: 현재 {current_angles[i]:.1f}°")
+                print(f"👉 {m['name']} 반시계 방향 회전 중...")
+                move_steps(h, m, steps=200, direction=0, delay=0.002)
+                print(f"✅ {m['name']} 완료, 모터 OFF")
+                time.sleep(1)
 
     except KeyboardInterrupt:
         print("\n정지: GPIO 해제 중...")
