@@ -1,82 +1,58 @@
-import paho.mqtt.client as mqtt
+# controller.py (라즈베리파이 A: 카메라)
+import subprocess
 import time
+import paho.mqtt.client as mqtt
 from webcam import run_webcam
-from maping import run_mapping
 from predict import run_predict
 
+# === SSH 설정 ===
+ROBOT_IP = "192.168.0.22"   # 2라파5 IP (수정 필요)
+ROBOT_USER = "pi"           # 2라파5 사용자 계정
+ROBOT_FILE = "/home/pi/projects/robot/robotarm.py"  # 2라파5에서 robotarm.py의 실제 경로로 수정하세요
+
 # === MQTT 설정 ===
-BROKER_IP = "192.168.0.21"   # 브로커 IP (공유기에서 카메라 RPi IP로 설정 가능)
+BROKER_IP = "192.168.0.21"   # 브로커가 되는 RPi IP (보통 카메라 RPi 자체)
 COMMAND_TOPIC = "command/robotarm"
 STATUS_TOPIC = "status/robotarm"
 
-# MQTT 클라이언트 생성
 client = mqtt.Client()
 
 def on_message(client, userdata, msg):
     data = msg.payload.decode()
-    print(f"[라즈베리파이B 메시지 수신] {data}")
+    print(f"[로봇팔 상태 수신] {data}")
 
     if data == "납땜 완료":
         print("📷 카메라 촬영 및 AI 판독 시작...")
-        saved = run_webcam()   # 웹캠으로 이미지 저장
+        saved = run_webcam()   # YOLO 웹캠으로 이미지 촬영
         if saved:
-            run_predict(saved)  # 저장한 이미지 분류
+            run_predict(saved)  # 촬영 이미지 분류
         else:
             print("⚠️ 이미지 저장 실패")
 
-# 콜백 등록
-client.on_message = on_message
-client.connect(BROKER_IP, 1883)
-client.subscribe(STATUS_TOPIC)
-client.loop_start()
-
-# === Controller 메뉴 ===
-def controller_menu():
-    while True:
-        print("\n=== Controller Menu ===")
-        print("1. PCB 매핑 실행")
-        print("2. YOLO 웹캠 실행")
-        print("3. 카메라 촬영 및 AI 판독")
-        print("4. 로봇팔 작업 시작 (신호 전송)")
-        print("5. 전체 실행 (매핑→YOLO→AI→로봇팔)")
-        print("6. 종료")
-        print("========================")
-
-        choice = input("선택: ").strip()
-
-        if choice == "1":
-            run_mapping()
-
-        elif choice == "2":
-            run_webcam()
-
-        elif choice == "3":
-            saved = run_webcam()
-            if saved:
-                run_predict(saved)
-
-        elif choice == "4":
-            print("👉 로봇팔 시작 신호 전송: OK")
-            client.publish(COMMAND_TOPIC, "OK")
-
-        elif choice == "5":
-            run_mapping()
-            saved = run_webcam()
-            if saved:
-                run_predict(saved)
-            print("👉 로봇팔 시작 신호 전송: OK")
-            client.publish(COMMAND_TOPIC, "OK")
-
-        elif choice == "6":
-            print("종료합니다.")
-            break
-
-        else:
-            print("⚠️ 잘못된 선택")
+def start_robotarm_remote():
+    # SSH를 통해 2라파5에서 robotarm.py 실행
+    cmd = f'ssh {ROBOT_USER}@{ROBOT_IP} "python3 {ROBOT_FILE}"'
+    print(f"👉 로봇팔 실행 명령 전송: {cmd}")
+    subprocess.Popen(cmd, shell=True)
 
 if __name__ == "__main__":
+    # 1. MQTT 초기화
+    client.on_message = on_message
+    client.connect(BROKER_IP, 1883)
+    client.subscribe(STATUS_TOPIC)
+    client.loop_start()
+
+    # 2. 원격에서 robotarm.py 실행
+    start_robotarm_remote()
+    time.sleep(3)  # robotarm.py가 실행될 시간을 조금 줌
+
+    # 3. 로봇팔 시작 신호 전송
+    print("👉 로봇팔 시작 신호 전송: OK")
+    client.publish(COMMAND_TOPIC, "OK")
+
     try:
-        controller_menu()
+        while True:
+            time.sleep(1)  # MQTT 수신 대기
     except KeyboardInterrupt:
         print("\n종료 (Ctrl+C)")
     finally:
