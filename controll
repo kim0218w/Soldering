@@ -1,0 +1,18 @@
+# motor_node.py
+import socket
+
+HOST = ""  # 모든 인터페이스
+PORT = 5000
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind((HOST, PORT))
+    s.listen()
+    conn, addr = s.accept()
+    with conn:
+        print("연결됨:", addr)
+        while True:
+            data = conn.recv(1024).decode()
+            if not data:
+                break
+            print("수신:", data)
+            # 문자열 파싱해서 모터 구동 함수 호출
