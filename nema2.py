@@ -1,4 +1,4 @@
-# stepper_4motor_scurve_refactored.py
+# stepper_4motor_scurve_sequential.py
 import lgpio
 import time
 import math
@@ -10,77 +10,103 @@ step_pin_3, dir_pin_3 = 23, 24
 step_pin_4, dir_pin_4 = 10, 9
 
 MOTORS = [
-    {"step": step_pin_1, "dir": dir_pin_1},
-    {"step": step_pin_2, "dir": dir_pin_2},
-    {"step": step_pin_3, "dir": dir_pin_3},
-    {"step": step_pin_4, "dir": dir_pin_4},
+    {"step": step_pin_1, "dir": dir_pin_1, "name": "모터1"},
+    {"step": step_pin_2, "dir": dir_pin_2, "name": "모터2"},
+    {"step": step_pin_3, "dir": dir_pin_3, "name": "모터3"},
+    {"step": step_pin_4, "dir": dir_pin_4, "name": "모터4"},
 ]
 
-# --- 스텝모터 파라미터 ---
-STEPS_PER_REV = 200              # 1회전 = 200스텝 (마이크로스텝에 맞게 수정)
+# 마이크로스텝 설정 (TB6600 DIP 스위치에 맞게 수정)
+MICROSTEP = 1
+STEPS_PER_REV = 200 * MICROSTEP
 DEG_PER_STEP = 360.0 / STEPS_PER_REV
 
-# --- GPIO 초기화 ---
-h = lgpio.gpiochip_open(0)
-for motor in MOTORS:
-    lgpio.gpio_claim_output(h, 0, motor["step"], 0)  # step 핀 LOW로 초기화
-    lgpio.gpio_claim_output(h, 0, motor["dir"], 0)   # dir 핀 LOW로 초기화
+# 하드웨어 타이밍
+DIR_SETUP_S = 0.000010       # 10us
+STEP_PULSE_MIN_S = 0.000010  # 10us
 
-# --- S-curve 프로파일 생성 ---
+def gpio_init():
+    h = lgpio.gpiochip_open(0)
+    for m in MOTORS:
+        lgpio.gpio_claim_output(h, 0, m["step"], 0)
+        lgpio.gpio_claim_output(h, 0, m["dir"], 0)
+    return h
+
+def gpio_cleanup(h):
+    for m in MOTORS:
+        try:
+            lgpio.gpio_free(h, m["step"])
+            lgpio.gpio_free(h, m["dir"])
+        except Exception:
+            pass
+    lgpio.gpiochip_close(h)
+
 def s_curve_profile(steps: int):
-    """
-    steps 길이의 S-curve 가속/감속 비율 배열을 생성.
-    (cosine 기반: 0 → 1 → 0 속도 변화)
-    """
+    if steps <= 1:
+        return [1.0]
     return [(1 - math.cos(math.pi * i / (steps - 1))) / 2 for i in range(steps)]
 
-# --- 모터 제어 함수 ---
-def move_stepper(motor, current_angle, target_angle, duration=1.0):
+def move_stepper(h, motor, current_angle, target_angle, duration=1.0):
     step_pin, dir_pin = motor["step"], motor["dir"]
 
     delta_angle = target_angle - current_angle
-    steps_needed = int(abs(delta_angle) / DEG_PER_STEP)
-
+    steps_needed = int(round(abs(delta_angle) / DEG_PER_STEP))
     if steps_needed == 0:
         return target_angle
 
-    # 방향 설정
     direction = 1 if delta_angle > 0 else 0
     lgpio.gpio_write(h, dir_pin, direction)
+    time.sleep(DIR_SETUP_S)
 
-    # S-curve 프로파일 생성
-    profile = s_curve_profile(steps_needed if steps_needed > 1 else 2)
+    EPS = 0.15
+    base_profile = s_curve_profile(steps_needed)
+    speed_weights = [EPS + (1.0 - EPS) * v for v in base_profile]
 
-    # 전체 이동 시간을 profile에 따라 분배
-    for weight in profile:
-        delay = (duration / steps_needed) * (1 + (1 - weight))  # 가속/감속 반영
+    inv_sum = sum(1.0 / w for w in speed_weights)
+    k = duration / inv_sum
+
+    for w in speed_weights:
+        period = max(k / w, STEP_PULSE_MIN_S * 2)
+        high_t = max(STEP_PULSE_MIN_S, period / 2)
+        low_t = max(STEP_PULSE_MIN_S, period - high_t)
+
         lgpio.gpio_write(h, step_pin, 1)
-        time.sleep(delay / 2)
+        time.sleep(high_t)
         lgpio.gpio_write(h, step_pin, 0)
-        time.sleep(delay / 2)
+        time.sleep(low_t)
 
     return target_angle
 
-# --- 메인 루프 ---
-if __name__ == "__main__":
-    current_angles = [0, 0, 0, 0]  # 1~4번 모터 현재 각도
+def main():
+    h = gpio_init()
+    current_angles = [0.0, 0.0, 0.0, 0.0]
 
+    print("순차 입력 모드: 모터1 → 모터2 → 모터3 → 모터4 순서로 각도 입력 후 즉시 동작합니다.")
+    print("입력 예) 90   (엔터만 치면 건너뜀, q 입력 시 종료)")
     try:
         while True:
-            raw = input("각도 입력 (예: 90 45 180 0): ")
-            target_angles = list(map(int, raw.split()))
+            for i, m in enumerate(MOTORS):
+                raw = input(f"{m['name']} 목표 각도? (현재 {current_angles[i]:.1f}°) : ").strip()
+                if raw.lower() in ("q", "quit", "exit"):
+                    raise KeyboardInterrupt
+                if raw == "":
+                    print(f" - {m['name']} 건너뜀")
+                    continue
+                try:
+                    target = float(raw)
+                except ValueError:
+                    print("⚠️ 숫자를 입력하세요. (예: 90, -45)")
+                    continue
 
-            if len(target_angles) != 4:
-                print("⚠️ 1~4번 모터 각도 4개를 입력해야 합니다.")
-                continue
-
-            for i in range(4):
-                print(f"👉 {i+1}번 모터 {current_angles[i]}° → {target_angles[i]}° 이동 중...")
-                current_angles[i] = move_stepper(MOTORS[i], current_angles[i], target_angles[i], duration=2.0)
+                print(f"👉 {m['name']} {current_angles[i]:.1f}° → {target:.1f}° 이동 중...")
+                current_angles[i] = move_stepper(h, m, current_angles[i], target, duration=2.0)
+                print(f"✅ {m['name']} 완료: 현재 {current_angles[i]:.1f}°")
 
     except KeyboardInterrupt:
-        print("\n정지: GPIO 해제")
-        for motor in MOTORS:
-            lgpio.gpio_free(h, motor["step"])
-            lgpio.gpio_free(h, motor["dir"])
-        lgpio.gpiochip_close(h)
+        print("\n정지: GPIO 해제 중...")
+    finally:
+        gpio_cleanup(h)
+        print("GPIO 해제 완료. 프로그램 종료.")
+
+if __name__ == "__main__":
+    main()
