@@ -23,8 +23,8 @@ DEG_PER_STEP = 360.0 / STEPS_PER_REV
 # --- GPIO 초기화 ---
 h = lgpio.gpiochip_open(0)
 for motor in MOTORS:
-    lgpio.gpio_claim_output(h, motor["step"])
-    lgpio.gpio_claim_output(h, motor["dir"])
+    lgpio.gpio_claim_output(h, motor["step"],0)
+    lgpio.gpio_claim_output(h, motor["dir"],0)
 
 # --- S-curve 프로파일 ---
 def s_curve_profile(steps: int):
