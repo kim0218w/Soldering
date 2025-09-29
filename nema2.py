@@ -25,6 +25,7 @@ h = lgpio.gpiochip_open(0)
 for motor in MOTORS:
     lgpio.gpio_claim_output(h, motor["step"],0)
     lgpio.gpio_claim_output(h, motor["dir"],0)
+lgpin.gpiochip_close(h)
 
 # --- S-curve 프로파일 ---
 def s_curve_profile(steps: int):
