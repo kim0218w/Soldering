@@ -4,10 +4,10 @@ import time
 import math
 
 # --- 모터 핀 설정 ---
-step_pin_1, dir_pin_1 = 17, 27
-step_pin_2, dir_pin_2 = 18, 23
-step_pin_3, dir_pin_3 = 22, 24
-step_pin_4, dir_pin_4 = 25, 5
+step_pin_1, dir_pin_1 = 17, 18
+step_pin_2, dir_pin_2 = 27, 22
+step_pin_3, dir_pin_3 = 23, 24
+step_pin_4, dir_pin_4 = 10, 9
 
 MOTORS = [
     {"step": step_pin_1, "dir": dir_pin_1},
