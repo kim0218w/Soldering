@@ -1,9 +1,9 @@
-# stepper_4motor_scurve.py
+# stepper_4motor_scurve_refactored.py
 import lgpio
 import time
 import math
 
-# --- 모터 핀 설정 ---
+# --- 모터 핀 설정 (BCM 번호) ---
 step_pin_1, dir_pin_1 = 17, 18
 step_pin_2, dir_pin_2 = 27, 22
 step_pin_3, dir_pin_3 = 23, 24
@@ -17,18 +17,21 @@ MOTORS = [
 ]
 
 # --- 스텝모터 파라미터 ---
-STEPS_PER_REV = 200              # 1회전 = 200스텝 (마이크로스텝 설정에 맞게 수정)
+STEPS_PER_REV = 200              # 1회전 = 200스텝 (마이크로스텝에 맞게 수정)
 DEG_PER_STEP = 360.0 / STEPS_PER_REV
 
 # --- GPIO 초기화 ---
 h = lgpio.gpiochip_open(0)
 for motor in MOTORS:
-    lgpio.gpio_claim_output(h, motor["step"],0)
-    lgpio.gpio_claim_output(h, motor["dir"],0)
-lgpin.gpiochip_close(h)
+    lgpio.gpio_claim_output(h, 0, motor["step"], 0)  # step 핀 LOW로 초기화
+    lgpio.gpio_claim_output(h, 0, motor["dir"], 0)   # dir 핀 LOW로 초기화
 
-# --- S-curve 프로파일 ---
+# --- S-curve 프로파일 생성 ---
 def s_curve_profile(steps: int):
+    """
+    steps 길이의 S-curve 가속/감속 비율 배열을 생성.
+    (cosine 기반: 0 → 1 → 0 속도 변화)
+    """
     return [(1 - math.cos(math.pi * i / (steps - 1))) / 2 for i in range(steps)]
 
 # --- 모터 제어 함수 ---
@@ -45,14 +48,16 @@ def move_stepper(motor, current_angle, target_angle, duration=1.0):
     direction = 1 if delta_angle > 0 else 0
     lgpio.gpio_write(h, dir_pin, direction)
 
-    # S-curve 생성
+    # S-curve 프로파일 생성
     profile = s_curve_profile(steps_needed if steps_needed > 1 else 2)
 
-    for _ in profile:
+    # 전체 이동 시간을 profile에 따라 분배
+    for weight in profile:
+        delay = (duration / steps_needed) * (1 + (1 - weight))  # 가속/감속 반영
         lgpio.gpio_write(h, step_pin, 1)
-        time.sleep(duration / steps_needed / 2)
+        time.sleep(delay / 2)
         lgpio.gpio_write(h, step_pin, 0)
-        time.sleep(duration / steps_needed / 2)
+        time.sleep(delay / 2)
 
     return target_angle
 
@@ -75,4 +80,7 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("\n정지: GPIO 해제")
+        for motor in MOTORS:
+            lgpio.gpio_free(h, motor["step"])
+            lgpio.gpio_free(h, motor["dir"])
         lgpio.gpiochip_close(h)
